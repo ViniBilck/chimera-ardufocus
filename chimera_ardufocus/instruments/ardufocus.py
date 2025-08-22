@@ -6,7 +6,7 @@ from chimera.interfaces.focuser import FocuserFeature, InvalidFocusPositionExcep
 from chimera.instruments.focuser import FocuserBase
 from chimera.core.chimeraobject import ChimeraObject
 
-class ARDUFocus(ChimeraObject):
+class ARDUFocus(FocuserBase):
     __config__ = {"param1": "a string parameter"}
 
     def __init__(self):
@@ -16,6 +16,6 @@ class ARDUFocus(ChimeraObject):
         self.doSomething("test argument")
 
     def doSomething(self, arg):
-        self.log.warning("Hi, I'm doing something.")
+        self.log.warning("Hello world")
         self.log.warning("My arg=%s" % arg)
         self.log.warning("My param1=%s" % self["param1"])
