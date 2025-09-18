@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 
 from chimera.core.lock import lock
 from chimera.interfaces.focuser import FocuserFeature, InvalidFocusPositionException, FocuserAxis
@@ -11,6 +12,7 @@ class ArduFocus(FocuserBase):
     def __init__(self):
         FocuserBase.__init__(self)
         self.tty = None
+        self._position = 0
         self._supports = {FocuserFeature.TEMPERATURE_COMPENSATION: False,
                           FocuserFeature.POSITION_FEEDBACK: True,
                           FocuserFeature.ENCODER: True,
@@ -20,7 +22,15 @@ class ArduFocus(FocuserBase):
                           FocuserFeature.CONTROLLABLE_U: False,
                           FocuserFeature.CONTROLLABLE_V: False,
                           FocuserFeature.CONTROLLABLE_W: False}
-        self._position = 1
+        self.home =  os.path.expanduser('~')
+        self.position_file = self.home + "/.chimera/current_focus_position.txt"
+        if os.path.isfile(self.position_file):
+            self.loadPostion()
+        else:
+            with open(self.position_file, 'w') as f:
+                self._position = 0
+                f.write(str(self._position))
+
 
     def __start__(self):
         self["model"] = "Ardufocus 0.1"
@@ -29,11 +39,20 @@ class ArduFocus(FocuserBase):
 
     def savePostion(self, position):
         try:
-            with open("~/.chimera/current_focus_position.txt", 'w') as f:
+            with open(self.position_file, 'w') as f:
               f.write(str(position))
-            print "Successfully saved position", position, "to", filename
+            print "Successfully saved position", position, "to", self.position_file
         except IOError as e:
             print "Error: Could not save position to file:", e
+
+    def loadPostion(self):
+        try:
+            with open(self.position_file, 'r') as f:
+                self._position = int(f.read().strip())
+                print "Loaded position:", self._position
+
+        except ValueError:
+            print "File is corrupt. Starting at position 0."
 
     @lock
     def moveIn(self, n, axis=FocuserAxis.Z):
@@ -43,6 +62,7 @@ class ArduFocus(FocuserBase):
 
         if self._inRange(target):
             self._setPosition(target)
+            #Here need to call Serial code to arduino
             self.savePostion(target)
         else:
             raise InvalidFocusPositionException("%d is outside focuser "
@@ -56,6 +76,7 @@ class ArduFocus(FocuserBase):
 
         if self._inRange(target):
             self._setPosition(target)
+            #Here need to call Serial code to arduino
             self.savePostion(target)
         else:
             raise InvalidFocusPositionException("%d is outside focuser "
@@ -63,11 +84,12 @@ class ArduFocus(FocuserBase):
 
     @lock
     def moveTo(self, position, axis=FocuserAxis.Z):
-        # Check if axis is on the permitted axis list
+
         self._checkAxis(axis)
 
         if self._inRange(position):
             self._setPosition(position)
+            #Here need to call Serial code to arduino
             self.savePostion(position)
         else:
             raise InvalidFocusPositionException("%d is outside focuser "
