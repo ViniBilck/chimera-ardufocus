@@ -1,116 +1,80 @@
-import logging
-import sys
-import os
-
 from chimera.core.lock import lock
-from chimera.interfaces.focuser import FocuserFeature, InvalidFocusPositionException, FocuserAxis
+
+from chimera.interfaces.focuser import (
+    FocuserFeature,
+    InvalidFocusPositionException,
+    FocuserAxis,
+)
+
 from chimera.instruments.focuser import FocuserBase
-from chimera.core.chimeraobject import ChimeraObject
-from chimera.core.constants import SYSTEM_CONFIG_DIRECTORY
+
 
 class ArduFocus(FocuserBase):
+
     def __init__(self):
         FocuserBase.__init__(self)
-        self.tty = None
+
         self._position = 0
-        self._supports = {FocuserFeature.TEMPERATURE_COMPENSATION: False,
-                          FocuserFeature.POSITION_FEEDBACK: True,
-                          FocuserFeature.ENCODER: True,
-                          FocuserFeature.CONTROLLABLE_X: False,
-                          FocuserFeature.CONTROLLABLE_Y: False,
-                          FocuserFeature.CONTROLLABLE_Z: True,
-                          FocuserFeature.CONTROLLABLE_U: False,
-                          FocuserFeature.CONTROLLABLE_V: False,
-                          FocuserFeature.CONTROLLABLE_W: False}
-        self.home =  os.path.expanduser('~')
-        self.position_file = self.home + "/.chimera/current_focus_position.txt"
-        if os.path.isfile(self.position_file):
-            self.loadPostion()
-        else:
-            with open(self.position_file, 'w') as f:
-                self._position = 0
-                f.write(str(self._position))
 
-
-    def __start__(self):
-        self["model"] = "Ardufocus 0.1"
-        self.tty = self["device"]
-        return True
-
-    def savePostion(self, position):
-        try:
-            with open(self.position_file, 'w') as f:
-              f.write(str(position))
-            print "Successfully saved position", position, "to", self.position_file
-        except IOError as e:
-            print "Error: Could not save position to file:", e
-
-    def loadPostion(self):
-        try:
-            with open(self.position_file, 'r') as f:
-                self._position = int(f.read().strip())
-                print "Loaded position:", self._position
-
-        except ValueError:
-            print "File is corrupt. Starting at position 0."
+        self._supports = {
+            FocuserFeature.TEMPERATURE_COMPENSATION: False,
+            FocuserFeature.POSITION_FEEDBACK: True,
+            FocuserFeature.ENCODER: True,
+            FocuserFeature.CONTROLLABLE_X: False,
+            FocuserFeature.CONTROLLABLE_Y: False,
+            FocuserFeature.CONTROLLABLE_Z: True,
+            FocuserFeature.CONTROLLABLE_U: False,
+            FocuserFeature.CONTROLLABLE_V: False,
+            FocuserFeature.CONTROLLABLE_W: False,
+        }
 
     @lock
-    def moveIn(self, n, axis=FocuserAxis.Z):
-        self._checkAxis(axis)
+    def move_in(self, n, axis=FocuserAxis.Z):
+        self._check_axis(axis)
+        target = self.get_position() - n
 
-        target = self.getPosition() - n
-
-        if self._inRange(target):
-            self._setPosition(target)
-            #Here need to call Serial code to arduino
-            self.savePostion(target)
+        if self._in_range(target):
+            self._set_position(target)
         else:
-            raise InvalidFocusPositionException("%d is outside focuser "
-                                                "boundaries." % target)
+            raise InvalidFocusPositionException(
+                f"{target} is outside focuser boundaries."
+            )
 
     @lock
-    def moveOut(self, n, axis=FocuserAxis.Z):
-        self._checkAxis(axis)
+    def move_out(self, n, axis=FocuserAxis.Z):
+        self._check_axis(axis)
+        target = self.get_position() + n
 
-        target = self.getPosition() + n
-
-        if self._inRange(target):
-            self._setPosition(target)
-            #Here need to call Serial code to arduino
-            self.savePostion(target)
+        if self._in_range(target):
+            self._set_position(target)
         else:
-            raise InvalidFocusPositionException("%d is outside focuser "
-                                                "boundaries." % target)
+            raise InvalidFocusPositionException(
+                f"{target} is outside focuser boundaries."
+            )
 
     @lock
-    def moveTo(self, position, axis=FocuserAxis.Z):
-
-        self._checkAxis(axis)
-
-        if self._inRange(position):
-            self._setPosition(position)
-            #Here need to call Serial code to arduino
-            self.savePostion(position)
+    def move_to(self, position, axis=FocuserAxis.Z):
+        self._check_axis(axis)
+        if self._in_range(position):
+            self._set_position(position)
         else:
-            raise InvalidFocusPositionException("%d is outside focuser "
-                                                "boundaries." % int(position))
+            raise InvalidFocusPositionException(
+                f"{int(position)} is outside focuser boundaries."
+            )
 
     @lock
-    def getPosition(self, axis=FocuserAxis.Z):
-        self._checkAxis(axis)
+    def get_position(self, axis=FocuserAxis.Z):
+        self._check_axis(axis)
         return self._position
 
+    def get_range(self, axis=FocuserAxis.Z):
+        self._check_axis(axis)
+        return (0, 7000)
 
-    def getRange(self, axis=FocuserAxis.Z):
-        self._checkAxis(axis)
-
-        return 0, 6600
-
-    def _setPosition(self, n):
-        self.log.info("Changing focuser to %s" % n)
+    def _set_position(self, n):
+        self.log.info(f"Changing focuser to {n}")
         self._position = n
 
-
-    def _inRange(self, n):
-        min_pos, max_pos = self.getRange()
-        return (min_pos <= n <= max_pos)
+    def _in_range(self, n):
+        min_pos, max_pos = self.get_range()
+        return min_pos <= n <= max_pos
